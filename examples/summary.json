@@ -1,0 +1,35 @@
+[
+  {
+    "messages": 8,
+    "model": "qwen/qwen3.5-9b",
+    "by_category": {
+      "late_order": 1,
+      "missing_or_wrong_item": 1,
+      "billing_refund": 1,
+      "courier_account_payout": 1,
+      "restaurant_partner": 2,
+      "app_issue": 1,
+      "praise": 1
+    },
+    "by_urgency": {
+      "medium": 5,
+      "high": 1,
+      "low": 2
+    },
+    "by_team": {
+      "Delivery operations": 1,
+      "Order support": 1,
+      "Payments": 1,
+      "Courier support": 1,
+      "Partner success": 2,
+      "Product and engineering": 1,
+      "Customer experience": 1
+    },
+    "needs_review": 0,
+    "high_urgency_ids": [
+      "MSG-003"
+    ],
+    "total_seconds": 746,
+    "avg_seconds_per_message": 93.3
+  }
+]

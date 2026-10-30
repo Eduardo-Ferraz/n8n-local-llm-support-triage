@@ -1,0 +1,42 @@
+[
+  {
+    "id": "MSG-001",
+    "channel": "customer_chat",
+    "text": "Meu pedido era pra chegar às 20h e já são 21h10. O app mostra o entregador parado no mesmo lugar há 40 minutos e ninguém responde no chat."
+  },
+  {
+    "id": "MSG-002",
+    "channel": "customer_chat",
+    "text": "Pedi dois hambúrgueres e veio só um, e a batata chegou fria. Quero o reembolso do item que faltou."
+  },
+  {
+    "id": "MSG-003",
+    "channel": "customer_email",
+    "text": "Fui cobrado duas vezes no cartão pelo mesmo pedido de ontem à noite. As duas cobranças já aparecem na fatura."
+  },
+  {
+    "id": "MSG-004",
+    "channel": "courier_app",
+    "text": "Sou entregador e o repasse da semana passada não caiu na minha conta. Como faço pra saber quando vai ser pago?"
+  },
+  {
+    "id": "MSG-005",
+    "channel": "partner_portal",
+    "text": "Tenho um restaurante parceiro e o cardápio no app continua mostrando os preços antigos, mesmo depois que atualizei ontem."
+  },
+  {
+    "id": "MSG-006",
+    "channel": "customer_chat",
+    "text": "O app fecha sozinho toda vez que tento aplicar um cupom no carrinho. Já reinstalei e continua."
+  },
+  {
+    "id": "MSG-007",
+    "channel": "customer_chat",
+    "text": "Só queria agradecer: o entregador foi super educado e ainda avisou que a sacola tinha molhado por causa da chuva."
+  },
+  {
+    "id": "MSG-008",
+    "channel": "customer_email",
+    "text": "Vocês entregam em Guarapari? Queria saber se já tem restaurantes na minha região."
+  }
+]

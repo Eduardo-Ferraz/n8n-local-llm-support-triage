@@ -1,0 +1,431 @@
+{
+  "id": "SupportTriage001",
+  "name": "Support triage with a local LLM",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-1",
+              "name": "llmBaseUrl",
+              "value": "http://host.docker.internal:1234/v1",
+              "type": "string"
+            },
+            {
+              "id": "cfg-2",
+              "name": "model",
+              "value": "qwen/qwen3.5-9b",
+              "type": "string"
+            },
+            {
+              "id": "cfg-3",
+              "name": "maxTokens",
+              "value": 600,
+              "type": "number"
+            },
+            {
+              "id": "cfg-4",
+              "name": "inputFile",
+              "value": "/data/messages.json",
+              "type": "string"
+            },
+            {
+              "id": "cfg-5",
+              "name": "reportFile",
+              "value": "/data/output/triage-report.csv",
+              "type": "string"
+            },
+            {
+              "id": "cfg-6",
+              "name": "summaryFile",
+              "value": "/data/output/summary.json",
+              "type": "string"
+            },
+            {
+              "id": "cfg-7",
+              "name": "maxMessages",
+              "value": 8,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.inputFile }}",
+        "options": {}
+      },
+      "id": "read-messages",
+      "name": "Read messages",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "id": "parse-json-file",
+      "name": "Parse JSON file",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "one-item-per-message",
+      "name": "One item per message",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": "={{ $('Config').first().json.maxMessages }}"
+      },
+      "id": "first-n-messages",
+      "name": "First N messages",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-over-messages",
+      "name": "Loop over messages",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Builds the chat-completions request for one support message.\n// The JSON schema makes the local model answer in a fixed shape that the next node can trust.\nconst cfg = $('Config').first().json;\n\nconst SYSTEM_PROMPT = `You are a support analyst for a food-delivery app in Brazil.\nYou receive one message from a customer, a courier or a partner restaurant. Classify it.\nWrite \"summary\" and \"suggested_reply\" in Brazilian Portuguese.\n\nCategories:\n- late_order: the order is late or the courier is not moving\n- missing_or_wrong_item: an item is missing, wrong or arrived in bad condition\n- billing_refund: wrong or double charges, refunds\n- app_issue: the app crashes, freezes or a feature does not work\n- courier_account_payout: a courier asking about sign-up, account or payouts\n- restaurant_partner: a partner restaurant asking about menu, orders or payouts\n- praise: a compliment, no action needed\n- other: anything else\n\nUrgency:\n- high: money charged wrongly, food safety, or an order in progress at risk\n- medium: someone is waiting for a fix\n- low: no one is blocked\n\nThe suggested reply is the first answer an agent would send: short, polite, specific to the message,\nand it never promises a refund or a deadline that a human has not approved.`;\n\nconst schema = {\n  type: 'object',\n  properties: {\n    category: {\n      type: 'string',\n      enum: ['late_order', 'missing_or_wrong_item', 'billing_refund', 'app_issue',\n             'courier_account_payout', 'restaurant_partner', 'praise', 'other'],\n    },\n    urgency: { type: 'string', enum: ['low', 'medium', 'high'] },\n    sentiment: { type: 'string', enum: ['negative', 'neutral', 'positive'] },\n    summary: { type: 'string' },\n    suggested_reply: { type: 'string' },\n  },\n  required: ['category', 'urgency', 'sentiment', 'summary', 'suggested_reply'],\n  additionalProperties: false,\n};\n\nreturn {\n  json: {\n    ...$json,\n    startedAt: Date.now(),\n    body: {\n      model: cfg.model,\n      temperature: 0,\n      max_tokens: cfg.maxTokens,\n      messages: [\n        { role: 'system', content: SYSTEM_PROMPT },\n        { role: 'user', content: `Channel: ${$json.channel}\\nMessage: ${$json.text}` },\n      ],\n      response_format: { type: 'json_schema', json_schema: { name: 'support_triage', strict: true, schema } },\n    },\n  },\n};\n"
+      },
+      "id": "build-llm-request",
+      "name": "Build LLM request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.llmBaseUrl }}/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "local-llm-(openai-compatible)",
+      "name": "Local LLM (OpenAI-compatible)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parses the model's answer and adds the routing rules.\n// The model classifies; the team and the SLA come from a table, so they never depend on the model.\nconst ROUTING = {\n  late_order: { team: 'Delivery operations', sla_hours: 0.5 },\n  missing_or_wrong_item: { team: 'Order support', sla_hours: 4 },\n  billing_refund: { team: 'Payments', sla_hours: 4 },\n  app_issue: { team: 'Product and engineering', sla_hours: 24 },\n  courier_account_payout: { team: 'Courier support', sla_hours: 24 },\n  restaurant_partner: { team: 'Partner success', sla_hours: 24 },\n  praise: { team: 'Customer experience', sla_hours: 72 },\n  other: { team: 'Customer service', sla_hours: 24 },\n};\n\nconst request = $('Build LLM request').item.json;\nconst raw = $json.choices?.[0]?.message?.content ?? '';\n\nlet triage = null;\ntry {\n  // Reasoning models may prepend a <think> block; only the JSON after it matters.\n  triage = JSON.parse(raw.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim());\n} catch (error) {\n  triage = null;\n}\n\n// An answer that does not parse, or a category outside the table, goes to a person instead of being guessed.\nconst valid = Boolean(triage && ROUTING[triage.category]);\nconst route = valid ? ROUTING[triage.category] : { team: 'Human review', sla_hours: 4 };\n\nreturn {\n  json: {\n    id: request.id,\n    channel: request.channel,\n    message: request.text,\n    category: valid ? triage.category : 'needs_review',\n    urgency: valid ? triage.urgency : 'medium',\n    sentiment: valid ? triage.sentiment : '',\n    summary: valid ? triage.summary : '',\n    suggested_reply: valid ? triage.suggested_reply : '',\n    team: route.team,\n    sla_hours: route.sla_hours,\n    model: $json.model ?? request.body.model,\n    seconds: Math.round((Date.now() - request.startedAt) / 100) / 10,\n    total_tokens: $json.usage?.total_tokens ?? null,\n  },\n};\n"
+      },
+      "id": "parse-and-route",
+      "name": "Parse and route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "csv",
+        "options": {
+          "fileName": "triage-report.csv"
+        }
+      },
+      "id": "to-csv",
+      "name": "To CSV",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Config').first().json.reportFile }}",
+        "options": {}
+      },
+      "id": "write-report",
+      "name": "Write report",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One summary for the whole run: what came in, where it went, and how long the local model took.\nconst rows = $input.all().map((item) => item.json);\nconst countBy = (key) =>\n  rows.reduce((acc, row) => ({ ...acc, [row[key]]: (acc[row[key]] ?? 0) + 1 }), {});\nconst seconds = rows.reduce((sum, row) => sum + row.seconds, 0);\n\nreturn [\n  {\n    json: {\n      messages: rows.length,\n      model: rows[0]?.model ?? null,\n      by_category: countBy('category'),\n      by_urgency: countBy('urgency'),\n      by_team: countBy('team'),\n      needs_review: rows.filter((row) => row.category === 'needs_review').length,\n      high_urgency_ids: rows.filter((row) => row.urgency === 'high').map((row) => row.id),\n      total_seconds: Math.round(seconds * 10) / 10,\n      avg_seconds_per_message: rows.length ? Math.round((seconds / rows.length) * 10) / 10 : 0,\n    },\n  },\n];\n"
+      },
+      "id": "summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "fileName": "summary.json",
+          "format": true
+        }
+      },
+      "id": "to-json",
+      "name": "To JSON",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Config').first().json.summaryFile }}",
+        "options": {}
+      },
+      "id": "write-summary",
+      "name": "Write summary",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        -60
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read messages": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON file": {
+      "main": [
+        [
+          {
+            "node": "One item per message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per message": {
+      "main": [
+        [
+          {
+            "node": "First N messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First N messages": {
+      "main": [
+        [
+          {
+            "node": "Loop over messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM request": {
+      "main": [
+        [
+          {
+            "node": "Local LLM (OpenAI-compatible)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local LLM (OpenAI-compatible)": {
+      "main": [
+        [
+          {
+            "node": "Parse and route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and route": {
+      "main": [
+        [
+          {
+            "node": "Loop over messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To CSV": {
+      "main": [
+        [
+          {
+            "node": "Write report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "To JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To JSON": {
+      "main": [
+        [
+          {
+            "node": "Write summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over messages": {
+      "main": [
+        [
+          {
+            "node": "To CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build LLM request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
